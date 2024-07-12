@@ -3,9 +3,9 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jul 10, 2024 at 10:46 AM
+-- Generation Time: Jul 12, 2024 at 06:52 AM
 -- Server version: 10.4.32-MariaDB
--- PHP Version: 8.2.12
+-- PHP Version: 8.3.8
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -18,8 +18,62 @@ SET time_zone = "+00:00";
 /*!40101 SET NAMES utf8mb4 */;
 
 --
--- Database: `warehouse`
+-- Database: `final`
 --
+
+DELIMITER $$
+--
+-- Procedures
+--
+CREATE DEFINER=`root`@`localhost` PROCEDURE `addStock` (`product_id` INT, `amount` INT)   BEGIN
+    UPDATE stok SET jumlah = jumlah + amount WHERE id_produk = product_id;
+END$$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `listProductsHigh` ()   BEGIN
+    SELECT * FROM produk WHERE harga > 2000000;
+END$$
+
+--
+-- Functions
+--
+CREATE DEFINER=`root`@`localhost` FUNCTION `calculateTotalPrice` (`product_id` INT, `quantity` INT) RETURNS DECIMAL(10,2)  BEGIN
+    DECLARE unit_price DECIMAL(10,2);
+    DECLARE total_price DECIMAL(10,2);
+    SELECT harga INTO unit_price FROM produk WHERE id_produk = product_id;
+    SET total_price = unit_price * quantity;
+    RETURN total_price;
+END$$
+
+CREATE DEFINER=`root`@`localhost` FUNCTION `getProductCount` () RETURNS INT(11)  BEGIN
+    DECLARE count INT;
+    SELECT COUNT(*) INTO count FROM produk;
+    RETURN count;
+END$$
+
+DELIMITER ;
+
+-- --------------------------------------------------------
+
+--
+-- Stand-in structure for view `horizontal_view`
+-- (See below for the actual view)
+--
+CREATE TABLE `horizontal_view` (
+`id_produk` int(11)
+,`nama_produk` varchar(100)
+,`harga` decimal(10,2)
+);
+
+-- --------------------------------------------------------
+
+--
+-- Stand-in structure for view `inner_view`
+-- (See below for the actual view)
+--
+CREATE TABLE `inner_view` (
+`id_produk` int(11)
+,`nama_produk` varchar(100)
+);
 
 -- --------------------------------------------------------
 
@@ -73,6 +127,33 @@ INSERT INTO `kategori` (`id_kategori`, `nama_kategori`, `deskripsi`) VALUES
 (3, 'Perlengkapan Kantor', 'Peralatan dan perlengkapan untuk kantor'),
 (4, 'Audio', 'Perangkat audio dan aksesoris'),
 (5, 'Jaringan', 'Perangkat jaringan dan konektivitas');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `log`
+--
+
+CREATE TABLE `log` (
+  `id_log` int(11) NOT NULL,
+  `log_time` timestamp NOT NULL DEFAULT current_timestamp(),
+  `operation` varchar(50) DEFAULT NULL,
+  `table_name` varchar(50) DEFAULT NULL,
+  `old_value` text DEFAULT NULL,
+  `new_value` text DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `log`
+--
+
+INSERT INTO `log` (`id_log`, `log_time`, `operation`, `table_name`, `old_value`, `new_value`) VALUES
+(7, '2024-07-12 00:53:21', 'INSERT', 'produk', NULL, 'Laptop Acer'),
+(8, '2024-07-12 00:53:21', 'AFTER INSERT', 'produk', NULL, 'Laptop Acer'),
+(9, '2024-07-12 00:54:26', 'UPDATE', 'produk', 'Laptop Acer', 'Laptop Asus'),
+(10, '2024-07-12 00:54:26', 'AFTER UPDATE', 'produk', 'Laptop Acer', 'Laptop Asus'),
+(11, '2024-07-12 00:55:27', 'DELETE', 'produk', 'Laptop Asus', NULL),
+(12, '2024-07-12 00:55:27', 'AFTER DELETE', 'produk', 'Laptop Asus', NULL);
 
 -- --------------------------------------------------------
 
@@ -160,6 +241,52 @@ INSERT INTO `produk` (`id_produk`, `nama_produk`, `deskripsi`, `harga`, `unit`, 
 (9, 'USB Flash Drive', 'USB Flash Drive 32GB', 80000.00, 'piece', 4),
 (10, 'Cleaning Kit', 'Kit pembersih perangkat elektronik', 150000.00, 'set', 3);
 
+--
+-- Triggers `produk`
+--
+DELIMITER $$
+CREATE TRIGGER `after_product_delete` AFTER DELETE ON `produk` FOR EACH ROW BEGIN
+    INSERT INTO log (operation, table_name, old_value)
+    VALUES ('AFTER DELETE', 'produk', OLD.nama_produk);
+END
+$$
+DELIMITER ;
+DELIMITER $$
+CREATE TRIGGER `after_product_insert` AFTER INSERT ON `produk` FOR EACH ROW BEGIN
+    INSERT INTO log (operation, table_name, new_value)
+    VALUES ('AFTER INSERT', 'produk', NEW.nama_produk);
+END
+$$
+DELIMITER ;
+DELIMITER $$
+CREATE TRIGGER `after_product_update` AFTER UPDATE ON `produk` FOR EACH ROW BEGIN
+    INSERT INTO log (operation, table_name, old_value, new_value)
+    VALUES ('AFTER UPDATE', 'produk', OLD.nama_produk, NEW.nama_produk);
+END
+$$
+DELIMITER ;
+DELIMITER $$
+CREATE TRIGGER `before_product_delete` BEFORE DELETE ON `produk` FOR EACH ROW BEGIN
+    INSERT INTO log (operation, table_name, old_value)
+    VALUES ('DELETE', 'produk', OLD.nama_produk);
+END
+$$
+DELIMITER ;
+DELIMITER $$
+CREATE TRIGGER `before_product_insert` BEFORE INSERT ON `produk` FOR EACH ROW BEGIN
+    INSERT INTO log (operation, table_name, new_value)
+    VALUES ('INSERT', 'produk', NEW.nama_produk);
+END
+$$
+DELIMITER ;
+DELIMITER $$
+CREATE TRIGGER `before_product_update` BEFORE UPDATE ON `produk` FOR EACH ROW BEGIN
+    INSERT INTO log (operation, table_name, old_value, new_value)
+    VALUES ('UPDATE', 'produk', OLD.nama_produk, NEW.nama_produk);
+END
+$$
+DELIMITER ;
+
 -- --------------------------------------------------------
 
 --
@@ -178,7 +305,7 @@ CREATE TABLE `stok` (
 --
 
 INSERT INTO `stok` (`id_stok`, `id_produk`, `jumlah`, `lokasi_rak`) VALUES
-(1, 1, 50, 'A1-01'),
+(1, 1, 100, 'A1-01'),
 (2, 2, 100, 'A2-02'),
 (3, 3, 30, 'B1-03'),
 (4, 4, 40, 'B2-04'),
@@ -244,6 +371,68 @@ INSERT INTO `transaksi` (`id_transaksi`, `tanggal_transaksi`, `jenis_transaksi`,
 (4, '2024-07-04 16:45:00', 'Keluar', 4, 3, 4, 'Pengiriman ke cabang'),
 (5, '2024-07-05 10:30:00', 'Masuk', 5, 15, 2, 'Pengiriman dari supplier');
 
+-- --------------------------------------------------------
+
+--
+-- Stand-in structure for view `vertical_view`
+-- (See below for the actual view)
+--
+CREATE TABLE `vertical_view` (
+`id_produk` int(11)
+,`nama_produk` varchar(100)
+,`deskripsi` text
+,`harga` decimal(10,2)
+,`unit` varchar(20)
+,`id_kategori` int(11)
+);
+
+-- --------------------------------------------------------
+
+--
+-- Stand-in structure for view `view_inside_view`
+-- (See below for the actual view)
+--
+CREATE TABLE `view_inside_view` (
+`id_produk` int(11)
+,`nama_produk` varchar(100)
+);
+
+-- --------------------------------------------------------
+
+--
+-- Structure for view `horizontal_view`
+--
+DROP TABLE IF EXISTS `horizontal_view`;
+
+CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `horizontal_view`  AS SELECT `produk`.`id_produk` AS `id_produk`, `produk`.`nama_produk` AS `nama_produk`, `produk`.`harga` AS `harga` FROM `produk` ;
+
+-- --------------------------------------------------------
+
+--
+-- Structure for view `inner_view`
+--
+DROP TABLE IF EXISTS `inner_view`;
+
+CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `inner_view`  AS SELECT `produk`.`id_produk` AS `id_produk`, `produk`.`nama_produk` AS `nama_produk` FROM `produk` WHERE `produk`.`harga` > 1000000 ;
+
+-- --------------------------------------------------------
+
+--
+-- Structure for view `vertical_view`
+--
+DROP TABLE IF EXISTS `vertical_view`;
+
+CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `vertical_view`  AS SELECT `produk`.`id_produk` AS `id_produk`, `produk`.`nama_produk` AS `nama_produk`, `produk`.`deskripsi` AS `deskripsi`, `produk`.`harga` AS `harga`, `produk`.`unit` AS `unit`, `produk`.`id_kategori` AS `id_kategori` FROM `produk` WHERE `produk`.`id_kategori` = 1 ;
+
+-- --------------------------------------------------------
+
+--
+-- Structure for view `view_inside_view`
+--
+DROP TABLE IF EXISTS `view_inside_view`;
+
+CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `view_inside_view`  AS SELECT `inner_view`.`id_produk` AS `id_produk`, `inner_view`.`nama_produk` AS `nama_produk` FROM `inner_view` WHERE `inner_view`.`id_produk` < 5WITH CASCADEDCHECK OPTION  ;
+
 --
 -- Indexes for dumped tables
 --
@@ -261,31 +450,41 @@ ALTER TABLE `kategori`
   ADD PRIMARY KEY (`id_kategori`);
 
 --
+-- Indexes for table `log`
+--
+ALTER TABLE `log`
+  ADD PRIMARY KEY (`id_log`);
+
+--
 -- Indexes for table `lokasi`
 --
 ALTER TABLE `lokasi`
-  ADD PRIMARY KEY (`id_lokasi`);
+  ADD PRIMARY KEY (`id_lokasi`),
+  ADD KEY `idx_nama_status` (`nama_lokasi`,`status`);
 
 --
 -- Indexes for table `pesanan`
 --
 ALTER TABLE `pesanan`
   ADD PRIMARY KEY (`id_pesanan`),
-  ADD KEY `id_produk` (`id_produk`);
+  ADD KEY `id_produk` (`id_produk`),
+  ADD KEY `idx_order_date_amount` (`tanggal_pesanan`,`jumlah`);
 
 --
 -- Indexes for table `produk`
 --
 ALTER TABLE `produk`
   ADD PRIMARY KEY (`id_produk`),
-  ADD KEY `id_kategori` (`id_kategori`);
+  ADD KEY `id_kategori` (`id_kategori`),
+  ADD KEY `idx_nama_produk` (`nama_produk`,`harga`);
 
 --
 -- Indexes for table `stok`
 --
 ALTER TABLE `stok`
   ADD PRIMARY KEY (`id_stok`),
-  ADD UNIQUE KEY `id_produk` (`id_produk`);
+  ADD UNIQUE KEY `id_produk` (`id_produk`),
+  ADD KEY `idx_produk_lokasi` (`id_produk`,`lokasi_rak`);
 
 --
 -- Indexes for table `supplier`
@@ -318,6 +517,12 @@ ALTER TABLE `kategori`
   MODIFY `id_kategori` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
+-- AUTO_INCREMENT for table `log`
+--
+ALTER TABLE `log`
+  MODIFY `id_log` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+
+--
 -- AUTO_INCREMENT for table `lokasi`
 --
 ALTER TABLE `lokasi`
@@ -333,7 +538,7 @@ ALTER TABLE `pesanan`
 -- AUTO_INCREMENT for table `produk`
 --
 ALTER TABLE `produk`
-  MODIFY `id_produk` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
+  MODIFY `id_produk` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
 
 --
 -- AUTO_INCREMENT for table `stok`
